@@ -19,6 +19,19 @@ const generateToken = (user) => {
 };
 
 /**
+ * Generate refresh token for user
+ * @param {Object} user - User document
+ * @returns {String} Refresh token
+ */
+const generateRefreshToken = (user) => {
+  return jwt.sign(
+    { id: user._id },
+    process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+};
+
+/**
  * Register a new user
  * @route POST /api/auth/register
  * @access Public
@@ -120,12 +133,14 @@ exports.login = async (req, res) => {
       return res.status(400).json({ msg: 'Invalid credentials' });
     }
 
-    // Generate JWT token
+    // Generate JWT tokens
     const token = generateToken(user);
+    const refreshToken = generateRefreshToken(user);
 
-    // Return user data and token
+    // Return user data and tokens
     res.json({
       token,
+      refreshToken,
       user: {
         id: user._id,
         employeeId: user.employeeId,
@@ -163,22 +178,67 @@ exports.getCurrentUser = async (req, res) => {
 
 /**
  * Verify JWT token
- * @route POST /api/auth/verify
+ * @route GET /api/auth/verify
  * @access Public
  */
 exports.verifyToken = (req, res) => {
   try {
-    const token = req.header('x-auth-token');
-    
-    if (!token) {
-      return res.status(401).json({ valid: false });
-    }
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    res.json({ valid: true, user: decoded });
+    // Auth middleware already verified the token, so we just return success
+    res.json({ valid: true, user: req.user });
   } catch (error) {
     res.status(401).json({ valid: false });
+  }
+};
+
+/**
+ * Logout user (invalidate token)
+ * @route POST /api/auth/logout
+ * @access Private
+ */
+exports.logout = async (req, res) => {
+  try {
+    // In a stateless JWT setup, client-side should delete the token
+    // Here we could implement a token blacklist if needed
+    
+    res.json({ msg: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error.message);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+
+/**
+ * Refresh JWT token
+ * @route POST /api/auth/refresh-token
+ * @access Public (with refresh token)
+ */
+exports.refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(401).json({ msg: 'No refresh token provided' });
+    }
+    
+    // Verify refresh token
+    const decoded = jwt.verify(
+      refreshToken, 
+      process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET
+    );
+    
+    // Get user from database
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
+    
+    // Generate new access token
+    const newToken = generateToken(user);
+    
+    res.json({ token: newToken });
+  } catch (error) {
+    console.error('Refresh token error:', error.message);
+    res.status(401).json({ msg: 'Invalid or expired refresh token' });
   }
 };
 
@@ -247,6 +307,43 @@ exports.forgotPassword = async (req, res) => {
     });
   } catch (error) {
     console.error('Forgot password error:', error.message);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+
+/**
+ * Reset password using token
+ * @route POST /api/auth/reset-password/:token
+ * @access Public
+ */
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+    
+    if (!token || !password) {
+      return res.status(400).json({ msg: 'Missing required fields' });
+    }
+    
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Find user
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found or token expired' });
+    }
+    
+    // Update password
+    user.password = password;
+    await user.save();
+    
+    res.json({ msg: 'Password has been reset successfully' });
+  } catch (error) {
+    console.error('Reset password error:', error.message);
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      return res.status(401).json({ msg: 'Invalid or expired token' });
+    }
     res.status(500).json({ msg: 'Server error' });
   }
 };

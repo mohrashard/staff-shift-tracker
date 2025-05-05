@@ -1202,5 +1202,97 @@ exports.addShift = async (req, res) => {
     });
   }
 };
+// Add these methods to your existing adminController
+exports.getUserById = async (req, res) => {
+    try {
+      const user = await User.findById(req.params.id)
+        .select('-password -refreshToken');
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found'
+        });
+      }
+      
+      res.status(200).json({
+        success: true,
+        data: user
+      });
+    } catch (error) {
+      console.error('Error in getUserById:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Server Error',
+        message: error.message
+      });
+    }
+  };
+  
+  exports.updateUser = async (req, res) => {
+    try {
+      const { firstName, lastName, email, department, role } = req.body;
+      
+      const user = await User.findByIdAndUpdate(
+        req.params.id,
+        { firstName, lastName, email, department, role },
+        { new: true, runValidators: true }
+      ).select('-password -refreshToken');
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found'
+        });
+      }
+      
+      res.status(200).json({
+        success: true,
+        data: user,
+        message: 'User updated successfully'
+      });
+    } catch (error) {
+      console.error('Error in updateUser:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Server Error',
+        message: error.message
+      });
+    }
+  };
+  
+  exports.deleteUser = async (req, res) => {
+    try {
+      const user = await User.findById(req.params.id);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found'
+        });
+      }
+      
+      if (user.role === 'admin') {
+        return res.status(400).json({
+          success: false,
+          error: 'Cannot delete admin users'
+        });
+      }
+      
+      await user.remove();
+      
+      res.status(200).json({
+        success: true,
+        message: 'User deleted successfully'
+      });
+    } catch (error) {
+      console.error('Error in deleteUser:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Server Error',
+        message: error.message
+      });
+    }
+  };
 
 module.exports = exports;

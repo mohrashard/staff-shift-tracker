@@ -31,42 +31,7 @@ router.post('/break/start', auth, validateLocation, shiftController.startBreak);
  * @access  Private
  */
 router.post('/break/end', auth, validateLocation, shiftController.endBreak);
-
-/**
- * @route   GET /api/shifts/current
- * @desc    Get current shift status for logged-in user
- * @access  Private
- */
-router.get('/current', auth, shiftController.getCurrentShift);
-
-/**
- * @route   GET /api/shifts
- * @desc    Get all shifts for logged-in user with pagination
- * @access  Private
- */
-router.get('/', auth, shiftController.getUserShifts);
-
-/**
- * @route   GET /api/shifts/:id
- * @desc    Get shift by ID
- * @access  Private
- */
-router.get('/:id', auth, shiftController.getShiftById);
-
-/**
- * @route   PUT /api/shifts/:id
- * @desc    Update shift (admin or own shift only)
- * @access  Private
- */
-router.put('/:id', auth, shiftController.updateShift);
-
-/**
- * @route   DELETE /api/shifts/:id
- * @desc    Delete shift (admin only)
- * @access  Private (Admin)
- */
-router.delete('/:id', auth, shiftController.deleteShift);
-
+// Move these specific routes BEFORE the /:id route
 /**
  * @route   GET /api/shifts/stats/daily
  * @desc    Get daily shift statistics for logged-in user
@@ -87,5 +52,13 @@ router.get('/stats/weekly', auth, shiftController.getWeeklyStats);
  * @access  Private
  */
 router.get('/stats/monthly', auth, shiftController.getMonthlyStats);
+
+// Then define the wildcard/parameter routes after
+/**
+ * @route   GET /api/shifts/:id
+ * @desc    Get shift by ID
+ * @access  Private
+ */
+router.get('/:id', auth, shiftController.getShiftById);
 
 module.exports = router;
